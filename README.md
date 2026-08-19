@@ -126,6 +126,12 @@ City coefficients are relative to Faisalabad (the reference category). Notably, 
 
 This is not a contradiction: since "hazardous" is defined relative to each city's own threshold, the coefficient reflects how weather-sensitive each city's *relative* bad days are, not absolute severity. Rahim Yar Khan's lower threshold may be more directly reachable through weather conditions alone, while Faisalabad's much higher threshold may require additional factors beyond weather (e.g., traffic or industrial activity) that this model does not capture. This finding is consistent with the decision to exclude other pollutant readings as features (to avoid leakage) — it suggests Faisalabad's most severe pollution days may be driven by sources this model cannot see.
 
+## Error Analysis
+
+In evaluating the results, I found that the model missed 19 hazardous days, nearly all clustered within a single window (Jan 15-21, 2026), predicting them as "safe" when they were actually hazardous. This is a serious error for a project meant to support early-warning and prevention. Error analysis revealed that these missed days were not borderline cases; several had PM2.5 levels well above their city's threshold, and the weather data (particularly high humidity, the strongest predictor in the model) still pointed toward "hazardous." The likely explanation is that real smog episodes build up gradually over consecutive days, but this model treats each day independently, with no memory of recent conditions or trend. As a result, it cannot recognize when pollution has been accumulating over several days, even when a single day's weather conditions strongly suggest risk. A promising future improvement would be to add features that capture recent trend or persistence, such as the previous day's PM2.5 level or a rolling average over the past few days, giving the model some awareness of ongoing pollution buildup rather than treating every day in isolation.
+
+Following feedback from the dataset maintainer, I explored adjusting the classification threshold below the default 0.5 as an alternative way to improve recall, without training a new model. At threshold 0.3, recall improved from 20.8% to 25% (catching 6 of 24 hazardous days instead of 5), but precision dropped from a perfect 1.0 to 0.67, meaning roughly 1 in 3 hazardous warnings would be a false alarm. After weighing this tradeoff, I chose to keep the default threshold (0.5) as the primary model. My reasoning: for an early-warning system, the trustworthiness of every individual warning matters as much as the raw number of hazardous days caught, since a system that gives false alarms too often risks eroding user trust and being ignored over time, defeating its purpose regardless of its recall. This remains a genuine, debatable tradeoff rather than a clear-cut answer, and a lower threshold could be reconsidered if false alarms were judged to be an acceptable cost in a real deployment.
+
 ## Limitations
 
 **Limited hazardous examples.** The dataset had a limited number of hazardous examples: approximately 66 hazardous days out of 455 total city-days (roughly 91 days across each of the 5 cities). This mattered because more complex models (Random Forest, Gradient Boosting) could not find reliable patterns from so few positive examples, and instead defaulted toward conservative, majority-class-leaning predictions. As a result, the exact recall percentages reported here should not be assumed to hold on a larger or different dataset — the more reliable finding is the general pattern that complex models struggled more than simpler ones under this data constraint, not the precise recall numbers themselves.
@@ -142,6 +148,8 @@ This is not a contradiction: since "hazardous" is defined relative to each city'
 
 **Correlation, not causation.** Low wind speed is strongly associated with hazardous days in this model, but this may reflect wind speed as an indicator of calm, stagnant atmospheric conditions (which trap pollution) rather than wind speed directly causing pollution buildup. This distinction doesn't reduce the model's usefulness for prediction, but it means causal conclusions should not be drawn from these relationships.
 
+**Distribution shift between train and test.** Because the test set (Jan 15 onward) is entirely Winter, while the training set includes both Autumn and Winter, the model was tested on somewhat different weather conditions than it was trained on. This is a separate issue from dropping the season feature earlier, and it's a real limitation of working with a dataset that only spans one short window of time.
+
 ## Future Improvements
 
 - **Re-run on the corrected dataset**, now that the dataset maintainer has fixed the flat-weather-readings issue, and compare results to this analysis
@@ -150,6 +158,8 @@ This is not a contradiction: since "hazardous" is defined relative to each city'
 - **Include non-weather features** (traffic data, industrial zone proximity, crop-burning activity) where available, to test whether they explain the pollution variation weather alone cannot, particularly for cities like Faisalabad
 - **Extend to a longer time range**, covering multiple years and all seasons, to enable trend analysis and reduce the small-sample limitations on the hazardous class
 - **Explore hourly-level prediction** as a complement to the daily model, now that a bimodal hourly pollution pattern has been identified
+- **Add trend/persistence features** (e.g., previous day's PM2.5, or a rolling average over recent days), based on error analysis showing the model consistently misses multi-day smog episodes since it currently treats each day independently
+
 
 ## How to Run This Project
 
